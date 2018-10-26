@@ -10,10 +10,15 @@ from collections import defaultdict
 def parse(f):
     songs = defaultdict(list)
     for line in f:
+        # first char of entry is always not a space
         if not line or line[0] == ' ':
             continue
+        # sometimes we get entries like
+        # 1 - Really Long Song Name ......
+        #                   Artist Name  1994
         if len(line) < 69:
             line = line.rstrip() + next(f)
+
         line = line.strip()
         match = re.match(r'^\d+ {0,1}- {0,1}(.+?) {2,}(.+?) +\d+$', line)
         if match is not None:
@@ -22,6 +27,7 @@ def parse(f):
             artists = artists.strip().split('/')
             for artist in artists:
                 songs[artist].append(song)
+
     return songs
 
 
@@ -32,47 +38,73 @@ def parse(f):
 #      | "BYE"
 
 
-def get_next_packet(s):
-    header = s.recv(10)
+def recv_packet(s):
+    invalid = None, None
+    try:
 
-    type, length = header.split(b" ")
-    length = int(length)
-    data = s.recv(length + 1)[1:]  # (need to add newline)
+        header = s.recv(10)
+        if not header:
+            return invalid
 
-    assert type in {b"REQ", b"RES", b"BYE"}
-    assert len(data) == length
-    return type, data
+        type, length = header.split(b" ")
+        length = int(length)
+        # need to receive and ignore newline
+        data = s.recv(length + 1)[1:]
+        if len(data) != length:
+            return invalid
+
+        return type, data
+
+    except socket.timeout:
+        return invalid
 
 
-def write_packet(s, type, data):
-    header = type + b' ' + ('{0:06d}'.format(len(data))).encode('ascii')
-    packet = header + b'\n' + data
-    s.sendall(packet)
+def send_packet(s, type, data):
+    try:
+        length = ('{0:06d}'.format(len(data))).encode('ascii')
+        header = type + b' ' + length
+        packet = header + b'\n' + data
+        s.sendall(packet)
+        return True
+    except socket.timeout:
+        return False
 
 
 def log(text, lock=threading.Lock()):
     with lock:
         id = threading.current_thread().ident
         now = str(datetime.datetime.now())
+        msg = '[{now}] [worker-{id}] {text}'.format(
+            now=now,
+            id=id,
+            text=text,
+        )
+        print(msg)
         with open('server.log', 'a') as fp:
-            fp.write(f'[{now}] [worker-{id}] {text}\n')
+            fp.write(msg + '\n')
 
 
 def handle_connection(songs, sock, addr):
     t0 = time.time()
     while True:
-        type, data = get_next_packet(sock)
-        if type == b'REQ':
-            artist = data.decode()
-            log(f"Received artist from {addr}: {artist}")
-            songs = b'\n'.join(x.encode('ascii') for x in songs[artist])
-            write_packet(sock, b'RES', songs)
-            continue
+        type, data = recv_packet(sock)
+        if type is None:
+            log("{addr} timed out.".format(addr=addr))
+            sock.close()
+            break
 
-        if type == b'BYE':
+        elif type == b'REQ':
+            artist = data.decode()
+            log("Received artist from {addr}: {artist}".format(addr=addr, artist=artist))
+            songs = b'\n'.join(x.encode('ascii') for x in songs[artist])
+            ok = send_packet(sock, b'RES', songs)
+            if not ok:
+                break
+
+        elif type == b'BYE':
             dt = time.time() - t0
             sock.close()
-            log(f"Connection ended with {addr} ({dt}s).")
+            log("Connection ended with {addr} ({dt}s).".format(addr=addr, dt=dt))
             break
 
 
@@ -85,13 +117,15 @@ def main(f):
         s.bind(('localhost', port))
     except OSError:
         print("ERROR: Unable to bind to port")
-        return
+        exit(1)
     s.listen()
-    log(f"Server started, listening at port {port}")
+    log("Server started, listening at port {port}".format(port=port))
     try:
         while True:
             sock, addr = s.accept()
-            log(f"Received connection from {addr}")
+            sock.settimeout(10)
+            addr = addr[0] + ':' + str(addr[1])
+            log("Received connection from {addr}".format(addr=addr))
             t.submit(handle_connection, songs, sock, addr)
     finally:
         # needs to be before t.shutdown because t.shutdown will
