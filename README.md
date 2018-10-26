@@ -1,7 +1,7 @@
 Server
 ======
 
-To start the server:
+By default the server binds to `localhost:8080`. To start the server:
 
     $ ./server.sh songs.txt
 

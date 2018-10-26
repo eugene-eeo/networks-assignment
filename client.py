@@ -37,6 +37,8 @@ def main():
 
     # send request
     try_send(s, b'REQ', artist.encode('ascii'))
+    #_, _ = try_recv(s)
+    #print('Server received query')
     _, data = try_recv(s)
     songs = data.decode('ascii')
     print('Songs:')

@@ -36,10 +36,11 @@ def parse(f):
 #
 # message    = header(10) + "\n" + data
 # header(10) = type(3) + " " + length(6) (base 10 with 0-padding)
-# type = "REQ"
-#      | "RES"
-#      | "BYE"
-#      | "END"
+# type = "REQ"  => request songs
+#      | "ACK"  => ack request
+#      | "RES"  => response songs
+#      | "BYE"  => request end
+#      | "END"  => ack end
 
 
 def recv_packet(s):
@@ -95,10 +96,12 @@ def handle_connection(songs, sock, addr):
         type, data = recv_packet(sock)
         if type is None:
             log("{addr} timed out.".format(addr=addr))
-            sock.close()
             break
 
         elif type == b'REQ':
+            #ok = send_packet(sock, b'ACK', b'')
+            #if not ok:
+            #    break
             artist = data.decode()
             log("Received artist from {addr}: {artist}".format(addr=addr, artist=artist))
             songs = b'\n'.join(x.encode('ascii') for x in songs[artist])
@@ -108,10 +111,11 @@ def handle_connection(songs, sock, addr):
 
         elif type == b'BYE':
             send_packet(sock, b'END', b'')
-            dt = time.time() - t0
-            sock.close()
-            log("Connection ended with {addr} ({dt}s).".format(addr=addr, dt=dt))
             break
+
+    sock.close()
+    dt = time.time() - t0
+    log("Connection ended with {addr} ({dt}s).".format(addr=addr, dt=dt))
 
 
 def main(f):
