@@ -48,7 +48,9 @@ def main():
 
     input('Quit? (Enter)')
     try_send(s, b'BYE', b'')
+    try_recv(s)
     s.close()
+    print('Connection closed by server.')
 
 
 if __name__ == '__main__':

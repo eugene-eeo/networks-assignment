@@ -36,6 +36,7 @@ def parse(f):
 # type = "REQ"
 #      | "RES"
 #      | "BYE"
+#      | "END"
 
 
 def recv_packet(s):
@@ -102,6 +103,7 @@ def handle_connection(songs, sock, addr):
                 break
 
         elif type == b'BYE':
+            send_packet(sock, b'END', b'')
             dt = time.time() - t0
             sock.close()
             log("Connection ended with {addr} ({dt}s).".format(addr=addr, dt=dt))
@@ -118,7 +120,7 @@ def main(f):
     except OSError:
         print("ERROR: Unable to bind to port")
         exit(1)
-    s.listen()
+    s.listen(4)
     log("Server started, listening at port {port}".format(port=port))
     try:
         while True:
