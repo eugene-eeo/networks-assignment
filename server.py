@@ -31,8 +31,11 @@ def parse(f):
     return songs
 
 
-# message    = header + "\n" + data
-# header(10) = type(3) + " " + length(6) (base 10 with padding)
+# PROTOCOL
+# --------
+#
+# message    = header(10) + "\n" + data
+# header(10) = type(3) + " " + length(6) (base 10 with 0-padding)
 # type = "REQ"
 #      | "RES"
 #      | "BYE"
@@ -42,20 +45,18 @@ def parse(f):
 def recv_packet(s):
     invalid = None, None
     try:
-
         header = s.recv(10)
         if not header:
             return invalid
 
         type, length = header.split(b" ")
         length = int(length)
-        # need to receive and ignore newline
-        data = s.recv(length + 1)[1:]
-        if len(data) != length:
+        data = s.recv(length + 1)
+        if len(data) != length + 1:
             return invalid
 
-        return type, data
-
+        # remember to drop newline
+        return type, data[1:]
     except socket.timeout:
         return invalid
 
@@ -71,13 +72,16 @@ def send_packet(s, type, data):
         return False
 
 
-def log(text, lock=threading.Lock()):
+def log(text, lock=threading.Lock(), workers={}):
     with lock:
         id = threading.current_thread().ident
+        if id not in workers:
+            workers[id] = 0
+            workers[id] = max(workers.values()) + 1
         now = str(datetime.datetime.now())
         msg = '[{now}] [worker-{id}] {text}'.format(
             now=now,
-            id=id,
+            id=workers[id],
             text=text,
         )
         print(msg)
