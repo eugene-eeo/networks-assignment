@@ -20,13 +20,20 @@ def parse(f):
             line = line.rstrip() + next(f)
 
         line = line.strip()
-        match = re.match(r'^\d+ {0,1}- {0,1}(.+?) {2,}(.+?) +\d+$', line)
-        if match is not None:
+        # sometimes we have
+        # n - Really Long Name......-Artist   Year
+        match = re.match(r'^\d+ {0,1}- {0,1}(.+?) +\d+$', line)
+        if match and '  ' not in match.group(1).strip():
+            song, artists = match.group(1).split('-')
+        else:
+            match = re.match(r'^\d+ {0,1}- {0,1}(.+?) {2,}(.+?) +\d+$', line)
+            if match is None:
+                continue
             song, artists = match.groups()
-            song = song.strip()
-            artists = artists.strip().split('/')
-            for artist in artists:
-                songs[artist].append(song)
+
+        song = song.strip()
+        for artist in artists.strip().split('/'):
+            songs[artist].append(song)
 
     return songs
 
