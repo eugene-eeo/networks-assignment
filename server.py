@@ -1,3 +1,4 @@
+import sys
 import re
 import time
 import socket
@@ -80,16 +81,16 @@ def send_packet(s, type, data):
         return False
 
 
-def log(text, lock=threading.Lock(), workers={}):
+def log(text, lock=threading.Lock(), ids={}):
+    now = str(datetime.datetime.now())
     with lock:
         id = threading.current_thread().ident
-        if id not in workers:
-            workers[id] = 0
-            workers[id] = max(workers.values()) + 1
-        now = str(datetime.datetime.now())
+        if id not in ids:
+            ids[id] = 0
+            ids[id] = max(ids.values()) + 1
         msg = '[{now}] [worker-{id}] {text}'.format(
             now=now,
-            id=workers[id],
+            id=ids[id],
             text=text,
         )
         print(msg)
@@ -106,9 +107,9 @@ def handle_connection(songs, sock, addr):
             break
 
         elif type == b'REQ':
-            #ok = send_packet(sock, b'ACK', b'')
-            #if not ok:
-            #    break
+            ok = send_packet(sock, b'ACK', b'')
+            if not ok:
+                break
             artist = data.decode()
             log("Received artist from {addr}: {artist}".format(addr=addr, artist=artist))
             songs = b'\n'.join(x.encode('ascii') for x in songs[artist])
@@ -125,8 +126,7 @@ def handle_connection(songs, sock, addr):
     log("Connection ended with {addr} ({dt}s).".format(addr=addr, dt=dt))
 
 
-def main(f):
-    songs = parse(open(f))
+def serve(songs):
     port = 8081
     t = ThreadPoolExecutor(max_workers=4)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -153,5 +153,4 @@ def main(f):
 
 
 if __name__ == '__main__':
-    import sys
-    main(sys.argv[1])
+    serve(parse(open(sys.argv[1])))
