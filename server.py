@@ -104,8 +104,9 @@ def handle_connection(songs, sock, addr):
                 send_packet(sock, b'ACK', b'')
                 artist = data.decode()
                 log("Received artist from {addr}: {artist}".format(addr=addr, artist=artist))
-                songs = b'\n'.join(song.encode('ascii') for song in songs[artist])
-                send_packet(sock, b'RES', songs)
+                song_list = [] if artist not in songs else songs[artist]
+                song_text = b'\n'.join(song.encode('ascii') for song in song_list)
+                send_packet(sock, b'RES', song_text)
 
             elif type == b'BYE':
                 send_packet(sock, b'END', b'')
