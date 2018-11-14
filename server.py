@@ -52,33 +52,26 @@ def parse(f):
 
 
 def recv_packet(s):
-    invalid = None, None
-    try:
-        header = s.recv(10)
-        if not header:
-            return invalid
-
-        type, length = header.split(b" ")
-        length = int(length)
-        data = s.recv(length + 1)
-        if len(data) != length + 1:
-            return invalid
-
-        # remember to drop newline
-        return type, data[1:]
-    except socket.timeout:
+    invalid = (None, None)
+    header = s.recv(10)
+    if not header:
         return invalid
+
+    type, length = header.split(b" ")
+    length = int(length)
+    data = s.recv(length + 1)
+    if len(data) != length + 1:
+        return invalid
+
+    # remember to drop newline
+    return type, data[1:]
 
 
 def send_packet(s, type, data):
-    try:
-        length = ('{0:06d}'.format(len(data))).encode('ascii')
-        header = type + b' ' + length
-        packet = header + b'\n' + data
-        s.sendall(packet)
-        return True
-    except socket.timeout:
-        return False
+    length = ('{0:06d}'.format(len(data))).encode('ascii')
+    header = type + b' ' + length
+    packet = header + b'\n' + data
+    s.sendall(packet)
 
 
 def log(text, lock=threading.Lock(), ids={}):
@@ -99,31 +92,30 @@ def log(text, lock=threading.Lock(), ids={}):
 
 
 def handle_connection(songs, sock, addr):
-    t0 = time.time()
-    while True:
-        type, data = recv_packet(sock)
-        if type is None:
-            log("{addr} timed out.".format(addr=addr))
-            break
-
-        elif type == b'REQ':
-            ok = send_packet(sock, b'ACK', b'')
-            if not ok:
-                break
-            artist = data.decode()
-            log("Received artist from {addr}: {artist}".format(addr=addr, artist=artist))
-            songs = b'\n'.join(x.encode('ascii') for x in songs[artist])
-            ok = send_packet(sock, b'RES', songs)
-            if not ok:
+    start_time = time.time()
+    try:
+        while True:
+            type, data = recv_packet(sock)
+            # invalid packet!
+            if type is None:
                 break
 
-        elif type == b'BYE':
-            send_packet(sock, b'END', b'')
-            break
+            elif type == b'REQ':
+                send_packet(sock, b'ACK', b'')
+                artist = data.decode()
+                log("Received artist from {addr}: {artist}".format(addr=addr, artist=artist))
+                songs = b'\n'.join(song.encode('ascii') for song in songs[artist])
+                send_packet(sock, b'RES', songs)
+
+            elif type == b'BYE':
+                send_packet(sock, b'END', b'')
+                break
+    except socket.error as e:
+        log("{addr} timed out".format(addr=addr))
 
     sock.close()
-    dt = time.time() - t0
-    log("Connection ended with {addr} ({dt}s).".format(addr=addr, dt=dt))
+    total_time = time.time() - start_time
+    log("Connection ended with {} ({}s).".format(addr, total_time))
 
 
 def serve(songs):

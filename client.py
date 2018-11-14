@@ -9,27 +9,35 @@ PORT = 8081
 
 
 def try_send(sock, type, data):
-    if not send_packet(sock, type, data):
+    try:
+        send_packet(sock, type, data)
+    except socket.error:
         print("Timeout: Server unavailable")
+        with open('client.log', 'a') as fp:
+            fp.write('[{0}] Timeout during {1}: server unavailable.\n'.format(datetime.datetime.now(), type))
+        sock.close()
         exit(1)
 
 
 def try_recv(sock, reason):
-    t0 = time.time()
     with open('client.log', 'a') as fp:
-        type, data = recv_packet(sock)
-        t1 = time.time()
-        if type is None:
+        try:
+            start_time = time.time()
+            type, data = recv_packet(sock)
+            if type is None:
+                raise socket.error
+            fp.write('[{0}] Server response ({1}): length={2}, time={3}s.\n'.format(
+                datetime.datetime.now(),
+                reason,
+                len(type) + 1 + len(data),
+                time.time() - start_time,
+                ))
+            return type, data
+        except socket.error:
             fp.write('[{0}] Timeout during {1}: server unavailable.\n'.format(datetime.datetime.now(), reason))
             print("Timeout: Server unavailable")
+            sock.close()
             exit(1)
-        fp.write('[{0}] Server response ({1}): length={2}, time={3}s.\n'.format(
-            datetime.datetime.now(),
-            reason,
-            len(type) + 1 + len(data),
-            t1 - t0,
-            ))
-        return type, data
 
 
 def main():
@@ -49,8 +57,12 @@ def main():
 
     # send request
     try_send(s, b'REQ', artist.encode('ascii'))
-    _, _ = try_recv(s, 'ack query')
+
+    # make sure that server receives request
+    try_recv(s, 'ack query')
     print('Server received query')
+
+    # then fetch songs
     _, data = try_recv(s, 'fetch songs')
     songs = data.decode('ascii')
     print('Songs:')
@@ -60,7 +72,7 @@ def main():
     else:
         print('<No results>')
 
-    input('Quit? (Enter)')
+    input('Press enter to quit.')
     try_send(s, b'BYE', b'')
     try_recv(s, 'close connection')
     s.close()
