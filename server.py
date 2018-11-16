@@ -96,7 +96,6 @@ def handle_connection(songs, sock, addr):
     try:
         while True:
             type, data = recv_packet(sock)
-            # invalid packet!
             if type is None:
                 break
 
@@ -111,12 +110,14 @@ def handle_connection(songs, sock, addr):
             elif type == b'BYE':
                 send_packet(sock, b'END', b'')
                 break
-    except socket.error as e:
-        log("{addr} timed out".format(addr=addr))
 
-    sock.close()
-    total_time = time.time() - start_time
-    log("Connection ended with {} ({}s).".format(addr, total_time))
+    except socket.error:
+        log("error when communicating with {addr}.".format(addr=addr))
+
+    finally:
+        sock.close()
+        total_time = time.time() - start_time
+        log("Connection ended with {} ({}s).".format(addr, total_time))
 
 
 def serve(songs):
@@ -132,9 +133,9 @@ def serve(songs):
     log("Server started, listening at port {port}".format(port=port))
     try:
         while True:
-            sock, addr = s.accept()
+            sock, (host, port) = s.accept()
             sock.settimeout(10)
-            addr = addr[0] + ':' + str(addr[1])
+            addr = '{host}:{port}'.format(host=host, port=port)
             log("Received connection from {addr}".format(addr=addr))
             t.submit(handle_connection, songs, sock, addr)
     finally:

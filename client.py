@@ -51,9 +51,10 @@ def main():
         exit(1)
 
     # get artist
-    artist = ''
-    while not artist:
+    while True:
         artist = input('Artist Name: ').strip()
+        if artist:
+            break
 
     # send request
     try_send(s, b'REQ', artist.encode('ascii'))
