@@ -29,7 +29,7 @@ def try_recv(sock, reason):
             fp.write('[{0}] Server response ({1}): length={2}, time={3}s.\n'.format(
                 datetime.datetime.now(),
                 reason,
-                len(type) + 1 + len(data),
+                11 + len(data),
                 time.time() - start_time,
                 ))
             return type, data
