@@ -2,8 +2,8 @@ import sys
 import re
 import time
 import socket
-import datetime
 import threading
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
 
@@ -75,7 +75,7 @@ def send_packet(s, type, data):
 
 
 def log(text, lock=threading.Lock(), ids={}):
-    now = str(datetime.datetime.now())
+    now = str(datetime.now())
     with lock:
         id = threading.current_thread().ident
         if id not in ids:
