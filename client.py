@@ -14,7 +14,7 @@ def try_send(sock, type, data):
     except socket.error:
         print("Timeout: Server unavailable")
         with open('client.log', 'a') as fp:
-            fp.write('[{0}] Timeout during {1}: server unavailable.\n'.format(datetime.datetime.now(), type))
+            fp.write('[{}] Timeout during {}: server unavailable.\n'.format(datetime.datetime.now(), type))
         sock.close()
         exit(1)
 
@@ -26,7 +26,7 @@ def try_recv(sock, reason):
             type, data = recv_packet(sock)
             if type is None:
                 raise socket.error
-            fp.write('[{0}] Server response ({1}): length={2}, time={3}s.\n'.format(
+            fp.write('[{}] Server response ({}): length={}, time={}s.\n'.format(
                 datetime.datetime.now(),
                 reason,
                 11 + len(data),
@@ -34,7 +34,7 @@ def try_recv(sock, reason):
                 ))
             return type, data
         except socket.error:
-            fp.write('[{0}] Timeout during {1}: server unavailable.\n'.format(datetime.datetime.now(), reason))
+            fp.write('[{}] Timeout during {}: server unavailable.\n'.format(datetime.datetime.now(), reason))
             print("Timeout: Server unavailable")
             sock.close()
             exit(1)

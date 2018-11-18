@@ -135,7 +135,7 @@ def serve(songs):
         while True:
             sock, (host, port) = s.accept()
             sock.settimeout(10)
-            addr = '{host}:{port}'.format(host=host, port=port)
+            addr = '{}:{}'.format(host, port)
             log("Received connection from {addr}".format(addr=addr))
             t.submit(handle_connection, songs, sock, addr)
     finally:
