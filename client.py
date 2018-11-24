@@ -50,6 +50,10 @@ def main():
         print(message)
         exit(1)
 
+    print("Waiting for connection...")
+    try_send(s, b'PIN', b'')
+    try_recv(s, 'server pong')
+    print("Connected to server.")
     # get artist
     while True:
         artist = input('Artist Name: ').strip()

@@ -44,11 +44,13 @@ def parse(f):
 #
 # message    = header(10) + "\n" + data
 # header(10) = type(3) + " " + length(6) (base 10 with 0-padding)
-# type = "REQ"  => request songs
+# type = "PIN"  => client ping
+#      | "NIP"  => server pong
+#      | "REQ"  => request songs
 #      | "ACK"  => ack request
 #      | "RES"  => response songs
 #      | "BYE"  => request end
-#      | "END"  => ack end
+#      | "EYB"  => ack end
 
 
 def recv_packet(s):
@@ -99,6 +101,9 @@ def handle_connection(songs, sock, addr):
             if type is None:
                 break
 
+            elif type == b'PIN':
+                send_packet(sock, b'NIP', b'')
+
             elif type == b'REQ':
                 send_packet(sock, b'ACK', b'')
                 artist = data.decode()
@@ -108,7 +113,7 @@ def handle_connection(songs, sock, addr):
                 send_packet(sock, b'RES', song_text)
 
             elif type == b'BYE':
-                send_packet(sock, b'END', b'')
+                send_packet(sock, b'EYB', b'')
                 break
 
     except socket.error:
@@ -122,14 +127,14 @@ def handle_connection(songs, sock, addr):
 
 def serve(songs):
     port = 8081
-    t = ThreadPoolExecutor(max_workers=4)
+    t = ThreadPoolExecutor(max_workers=1)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         s.bind(('localhost', port))
     except OSError:
         print("ERROR: Unable to bind to port")
         exit(1)
-    s.listen(4)
+    s.listen(1)
     log("Server started, listening at port {port}".format(port=port))
     try:
         while True:
