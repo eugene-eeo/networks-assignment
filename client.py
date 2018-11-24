@@ -1,6 +1,7 @@
 import datetime
 import time
 import socket
+from contextlib import contextmanager
 from server import recv_packet, send_packet
 
 
@@ -8,36 +9,49 @@ HOST = 'localhost'
 PORT = 8081
 
 
-def try_send(sock, type, data):
+@contextmanager
+def error_handler(operation, intent, sock):
+    exc = None
+    msg = None
     try:
-        send_packet(sock, type, data)
-    except socket.error:
-        print("Timeout: Server unavailable")
+        yield
+    except ValueError as exc:
+        msg, = exc.args
+    except socket.error as exc:
+        _, msg = exc.args
+    if msg is not None:
+        print("Error: " + msg)
         with open('client.log', 'a') as fp:
-            fp.write('[{}] Timeout during {}: server unavailable.\n'.format(datetime.datetime.now(), type))
+            fp.write('[{time}] {operation}: ({intent}) {msg}\n'.format(
+                time=datetime.datetime.now(),
+                operation=operation,
+                intent=intent,
+                msg=msg,
+                ))
         sock.close()
         exit(1)
 
 
-def try_recv(sock, reason):
-    with open('client.log', 'a') as fp:
-        try:
-            start_time = time.time()
-            type, data = recv_packet(sock)
-            if type is None:
-                raise socket.error
-            fp.write('[{}] Server response ({}): length={}, time={}s.\n'.format(
-                datetime.datetime.now(),
-                reason,
-                11 + len(data),
-                time.time() - start_time,
+def try_send(sock, intent, packet):
+    type, data = packet
+    with error_handler("send", intent, sock):
+        send_packet(sock, type, data)
+
+
+def try_recv(sock, intent):
+    with error_handler("recv", intent, sock):
+        start_time = time.time()
+        type, data = recv_packet(sock)
+        if type is None:
+            raise ValueError("Invalid packet! Maybe the server has closed the connection.")
+        with open('client.log', 'a') as fp:
+            fp.write('[{}] Server response ({}): length={}, delay={}s.\n'.format(
+                    datetime.datetime.now(),
+                    intent,
+                    11 + len(data),
+                    time.time() - start_time,
                 ))
-            return type, data
-        except socket.error:
-            fp.write('[{}] Timeout during {}: server unavailable.\n'.format(datetime.datetime.now(), reason))
-            print("Timeout: Server unavailable")
-            sock.close()
-            exit(1)
+        return type, data
 
 
 def main():
@@ -51,7 +65,7 @@ def main():
         exit(1)
 
     print("Waiting for connection...")
-    try_send(s, b'PIN', b'')
+    try_send(s, 'client ping', (b'PIN', b''))
     try_recv(s, 'server pong')
     print("Connected to server.")
     # get artist
@@ -60,11 +74,9 @@ def main():
         if artist:
             break
 
-    # send request
-    try_send(s, b'REQ', artist.encode('ascii'))
-
-    # make sure that server receives request
-    try_recv(s, 'ack query')
+    # send request and make sure that server receives request
+    try_send(s, 'song request', (b'REQ', artist.encode('ascii')))
+    try_recv(s, 'server ack query')
     print('Server received query')
 
     # then fetch songs
@@ -78,8 +90,8 @@ def main():
         print('<No results>')
 
     input('Press enter to quit.')
-    try_send(s, b'BYE', b'')
-    try_recv(s, 'close connection')
+    try_send(s, 'goodbye message', (b'BYE', b''))
+    try_recv(s, 'server ack for goodbye')
     s.close()
     print('Connection closed by server.')
 
