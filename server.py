@@ -127,7 +127,7 @@ def handle_connection(songs, sock, addr):
 
 def serve(songs):
     port = 8081
-    t = ThreadPoolExecutor(max_workers=1)
+    t = ThreadPoolExecutor(max_workers=4)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         s.bind(('localhost', port))
